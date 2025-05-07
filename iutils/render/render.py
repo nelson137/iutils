@@ -1,9 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# import cairocffi as cairo
-# from cairocffi import OPERATOR_SOURCE
-
 import cairo as cairo
 from cairo import OPERATOR_SOURCE
 
@@ -17,9 +14,14 @@ from numpy import sin
 from numpy import column_stack
 from numpy import square
 from numpy import array
-# from numpy import reshape
-# from numpy import floor
 
+
+import gi
+
+gi.require_version('Gtk', '4.0')
+
+
+APP_ID = 'com.nelsonearle.differential-line'
 
 TWOPI = pi*2
 
@@ -373,45 +375,43 @@ class Animate(Render):
   def __init__(self, n, front, back, step):
 
     from gi.repository import Gtk
-    from gi.repository import GObject
 
     Render.__init__(self, n, front, back)
 
-    window = Gtk.Window()
-    self.window = window
-    window.resize(self.n, self.n)
-
     self.step = step
 
-    window.connect("destroy", self.__destroy)
-    darea = Gtk.DrawingArea()
-    # darea.connect("expose-event", self.expose)
-    self.darea = darea
+    app = self.app = Gtk.Application(application_id=APP_ID)
 
-    window.add(darea)
-    window.show_all()
+    app.connect('activate', self.__activate)
+    app.connect('window-removed', self.__on_window_remove)
 
-    #self.cr = self.darea.window.cairo_create()
+  def __on_window_remove(self, _window, _data):
+
+    self.app.quit()
+
+  def __activate(self, app):
+
+    from gi.repository import Gtk
+    from gi.repository import GObject
+
+    window = self.window = Gtk.ApplicationWindow(application=app)
+    window.set_default_size(self.n, self.n)
+
+    darea = self.darea = Gtk.DrawingArea()
+    darea.set_draw_func(self.draw)
+
+    window.set_child(darea)
+    window.present()
+
     self.steps = 0
     GObject.idle_add(self.step_wrap)
 
-  def __destroy(self,*args):
-
-    from gi.repository import Gtk
-
-    Gtk.main_quit(*args)
-
   def start(self):
 
-    from gi.repository import Gtk
+    self.app.run(None)
 
-    Gtk.main()
+  def draw(self, widget, cr, _w, _h):
 
-  def expose(self, *args):
-
-    #cr = self.cr
-    # cr = self.darea.window.cairo_create()
-    cr = self.darea.get_property('window').cairo_create()
     cr.set_source_surface(self.sur, 0, 0)
     cr.paint()
 
@@ -419,7 +419,7 @@ class Animate(Render):
 
     res = self.step(self)
     self.steps += 1
-    self.expose()
+    self.darea.queue_draw()
 
     return res
 
